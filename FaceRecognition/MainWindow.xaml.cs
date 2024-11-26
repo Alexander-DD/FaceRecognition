@@ -23,6 +23,9 @@ namespace FaceRecognition
         private DispatcherTimer? _timer;
         private bool _cameraRunning = false;
 
+
+        private readonly MCvScalar _modelMeanValues = new MCvScalar(78.4263377603, 87.7689143744, 114.895847746);
+
         public MainWindow()
         {
             InitializeComponent();
@@ -48,7 +51,6 @@ namespace FaceRecognition
                 _cameraRunning = false;
 
                 StartCameraButton.Content = "Запуск камеры";
-                StartCameraButton.IsEnabled = true;
             }
             else
             {
@@ -60,8 +62,9 @@ namespace FaceRecognition
                 _cameraRunning = true;
 
                 StartCameraButton.Content = "Остановка камеры";
-                StartCameraButton.IsEnabled = true;
             }
+
+            StartCameraButton.IsEnabled = true;
         }
 
         // Обновление кадров
@@ -82,59 +85,6 @@ namespace FaceRecognition
                 }
             }
         }
-
-        //private async void StartCameraButton_Click(object sender, RoutedEventArgs e)
-        //{
-        //    Dispatcher.Invoke(() =>
-        //    {
-        //        StartCameraButton.IsEnabled = false;
-        //    });
-
-        //    if (_cameraRunning)
-        //    {
-        //        _capture?.Dispose();
-        //        //_timer.Stop();
-        //        _cameraRunning = false;
-        //        StartCameraButton.Content = "Запуск камеры";
-        //    }
-        //    else
-        //    {
-        //        StartCameraButton.Content = "Остановка камеры";
-
-        //        _capture = new VideoCapture();
-        //        _cameraRunning = true;
-
-        //        // Асинхронный запуск обработки кадров
-        //        await Task.Run(CaptureCamera);
-        //    }
-
-        //}
-
-        //private void CaptureCamera()
-        //{
-        //    while (_cameraRunning)
-        //    {
-        //        using (Mat frame = _capture.QueryFrame())
-        //        {
-        //            if (frame != null)
-        //            {
-        //                Image<Bgr, byte> image = frame.ToImage<Bgr, byte>();
-
-        //                if (_detectingFaces)
-        //                {
-        //                    DetectAndDrawFaces(image);
-        //                }
-
-        //                // Обновление UI через Dispatcher
-        //                Dispatcher.Invoke(() =>
-        //                {
-        //                    CameraFeed.Source = BitmapToImageSource(image.ToBitmap());
-        //                    StartCameraButton.IsEnabled = true;
-        //                });
-        //            }
-        //        }
-        //    }
-        //}
 
         // Конвертирование Bitmap в BitmapImage для отображения в WPF
         private BitmapImage BitmapToImageSource(Bitmap bitmap)
@@ -162,7 +112,7 @@ namespace FaceRecognition
             {
                 // Обрезаем изображение для определения возраста и пола
                 var faceRegion = new Mat(image.Mat, face);
-                var blob = DnnInvoke.BlobFromImage(faceRegion, 1.0, new System.Drawing.Size(227, 227), new MCvScalar(104, 177, 123));
+                var blob = DnnInvoke.BlobFromImage(faceRegion, 1.0, new System.Drawing.Size(227, 227), _modelMeanValues);
 
                 // Определение пола
                 _genderNet.SetInput(blob);
@@ -173,7 +123,7 @@ namespace FaceRecognition
 
                 // Определение возраста
                 _ageNet.SetInput(blob);
-                var agePredictions = _ageNet.Forward();
+                Mat agePredictions = _ageNet.Forward();
                 float[] ageMatches = GetMatData(agePredictions);
                 string[] ageGroups = new string[] { "0-2", "4-6", "8-12", "15-20", "25-32", "38-43", "48-53", "60+" };
                 string age = ageGroups[GetMaxIndex(ageMatches)];
@@ -182,10 +132,39 @@ namespace FaceRecognition
                 image.Draw(face, new Bgr(System.Drawing.Color.Red), 2);
                 var label = $"{gender}, Age: {age}";
 
+                // Определение размера текста на основе высоты лица
+                double fontSize = Math.Max(0.7, face.Height / 120.0); // Минимальный размер текста — 0.6
+                fontSize = Math.Min(1, face.Height / 120.0); // Минимальный размер текста — 0.6
+                int thickness = 1; // Толщина текста
+
                 // Добавляем текст с данными о возрасте и поле под лицом
                 var textPosition = new System.Drawing.Point(face.X, face.Y + face.Height + 20);
-                CvInvoke.PutText(image, label, textPosition, Emgu.CV.CvEnum.FontFace.HersheySimplex, 0.6, new Bgr(System.Drawing.Color.White).MCvScalar);
+                AddTextWithShadow(image, label, textPosition, fontSize, thickness);
             }
+        }
+
+        private void AddTextWithShadow(Image<Bgr, byte> image, string text, System.Drawing.Point position, double fontSize, int thickness)
+        {
+            // Цвет тени (например, черный)
+            var shadowColor = new Bgr(System.Drawing.Color.Black).MCvScalar;
+
+            // Цвет основного текста (например, белый)
+            var textColor = new Bgr(System.Drawing.Color.White).MCvScalar;
+
+            // Сдвиг тени
+            int shadowOffset = 2;
+
+            // Рисуем тень
+            CvInvoke.PutText(image, text,
+                new System.Drawing.Point(position.X + shadowOffset, position.Y + shadowOffset),
+                Emgu.CV.CvEnum.FontFace.HersheySimplex,
+                fontSize, shadowColor, thickness);
+
+            // Рисуем основной текст поверх тени
+            CvInvoke.PutText(image, text,
+                position,
+                Emgu.CV.CvEnum.FontFace.HersheySimplex,
+                fontSize, textColor, thickness);
         }
 
         private float[] GetMatData(Mat mat)
