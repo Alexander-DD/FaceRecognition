@@ -17,18 +17,21 @@
   </ItemGroup>
 
   <ItemGroup>
-    <EmbeddedResource Include="age_net.caffemodel">
+    <Content Include="deploy_age.prototxt">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </EmbeddedResource>
-    <EmbeddedResource Include="deploy_age.prototxt">
+    </Content>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="age_net.caffemodel">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </EmbeddedResource>
-    <EmbeddedResource Include="deploy_gender.prototxt">
+    </Content>
+    <Content Include="deploy_gender.prototxt">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </EmbeddedResource>
-    <EmbeddedResource Include="gender_net.caffemodel">
+    </Content>
+    <Content Include="gender_net.caffemodel">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </EmbeddedResource>
+    </Content>
     <EmbeddedResource Include="haarcascade_frontalface_default.xml">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </EmbeddedResource>
