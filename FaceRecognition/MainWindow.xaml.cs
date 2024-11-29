@@ -24,23 +24,44 @@ namespace FaceRecognition
         private bool _cameraRunning = false;
 
 
-        private readonly MCvScalar _modelMeanValues = new MCvScalar(78.4263377603, 87.7689143744, 114.895847746);
+        //private readonly MCvScalar _modelMeanValues = new MCvScalar(78.4263377603, 87.7689143744, 114.895847746);
+        private readonly MCvScalar _modelMeanValues;
+        private AppConfig _config;
 
         public MainWindow()
         {
             InitializeComponent();
 
-            // Загрузка классификатор лиц
-            _faceCascade = new CascadeClassifier("haarcascade_frontalface_default.xml");
+            try
+            {
+                // Загружаем конфигурацию
+                _config = AppConfig.Load("config.json");
 
-            // Загрузка модели для определения возраста и пола
-            _ageNet = DnnInvoke.ReadNetFromCaffe("deploy_age.prototxt", "age_net.caffemodel");
-            _genderNet = DnnInvoke.ReadNetFromCaffe("deploy_gender.prototxt", "gender_net.caffemodel");
+                // Проверяем конфигурацию
+                _config.Validate();
+
+                // Загружаем классификатор лиц
+                _faceCascade = new CascadeClassifier(_config.FaceCascade);
+
+                // Загружаем модели возраста и пола
+                _ageNet = DnnInvoke.ReadNetFromCaffe(_config.AgeModel.Prototxt, _config.AgeModel.CaffeModel);
+                _genderNet = DnnInvoke.ReadNetFromCaffe(_config.GenderModel.Prototxt, _config.GenderModel.CaffeModel);
+
+                // Инициализация MCvScalar
+                _modelMeanValues = new MCvScalar(_config.MCvScalar.V0, _config.MCvScalar.V1, _config.MCvScalar.V2);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Ошибка при загрузке настроек или моделей: {ex.Message}", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+                Environment.Exit(1); // Завершаем приложение, если настройки не удалось загрузить
+            }
         }
 
         private async void StartCameraButton_Click(object sender, RoutedEventArgs e)
         {
             StartCameraButton.IsEnabled = false;
+            SelectImageButton.IsEnabled = false;
+            ProcessImagesButton.IsEnabled = false;
 
             await Task.Delay(50);
 
@@ -65,6 +86,8 @@ namespace FaceRecognition
             }
 
             StartCameraButton.IsEnabled = true;
+            SelectImageButton.IsEnabled = true;
+            ProcessImagesButton.IsEnabled = true;
         }
 
         // Обновление кадров
@@ -106,19 +129,33 @@ namespace FaceRecognition
         private void DetectAndDrawFaces(Image<Bgr, byte> image)
         {
             var grayFrame = image.Convert<Gray, byte>();
-            var faces = _faceCascade.DetectMultiScale(grayFrame, 1.1, 10, System.Drawing.Size.Empty);
+            var faces = _faceCascade.DetectMultiScale(
+                grayFrame,
+                _config.CascadeSettings.ScaleFactor,
+                _config.CascadeSettings.MinNeighbors,
+                System.Drawing.Size.Empty);
 
-            foreach (var face in faces)
+            // Сортируем лица по Y, чтобы текст добавлялся упорядоченно сверху вниз
+            var sortedFaces = faces.OrderBy(face => face.Y).ToList();
+
+            // Храним текстовые области, чтобы проверять на пересечения
+            var usedTextAreas = new List<Rectangle>();
+
+            foreach (var face in sortedFaces)
             {
                 // Обрезаем изображение для определения возраста и пола
                 var faceRegion = new Mat(image.Mat, face);
-                var blob = DnnInvoke.BlobFromImage(faceRegion, 1.0, new System.Drawing.Size(227, 227), _modelMeanValues);
+                var blob = DnnInvoke.BlobFromImage(
+                    faceRegion,
+                    _config.BlobSettings.ScaleFactor,
+                    new System.Drawing.Size(_config.BlobSettings.Width, _config.BlobSettings.Height),
+                    _modelMeanValues);
 
                 // Определение пола
                 _genderNet.SetInput(blob);
                 Mat genderPredictions = _genderNet.Forward();
                 float[] genderMatches = GetMatData(genderPredictions);
-                string[] genders = new string[] { "Male", "Female" };
+                string[] genders = new string[] { "M", "W" };
                 string gender = genders[GetMaxIndex(genderMatches)];
 
                 // Определение возраста
@@ -130,16 +167,38 @@ namespace FaceRecognition
 
                 // Рисуем прямоугольник вокруг лица
                 image.Draw(face, new Bgr(System.Drawing.Color.Red), 2);
-                var label = $"{gender}, Age: {age}";
+
+                // Подготовка текста
+                var label = $"{gender},{age}";
+
+                // Определяем начальную позицию для текста
+                int textStartY = face.Y + face.Height + 20;
+
+                Rectangle textArea;
+                do
+                {
+                    textArea = new Rectangle(face.X, textStartY, face.Width, 20); // Примерная область текста
+                    if (usedTextAreas.Any(area => area.IntersectsWith(textArea)))
+                    {
+                        textStartY += 20; // Сдвигаем текст вниз, чтобы избежать наложения
+                    }
+                    else
+                    {
+                        break; // Если пересечений нет, выходим из цикла
+                    }
+                } while (true);
 
                 // Определение размера текста на основе высоты лица
                 double fontSize = Math.Max(0.7, face.Height / 120.0); // Минимальный размер текста — 0.6
                 fontSize = Math.Min(1, face.Height / 120.0); // Минимальный размер текста — 0.6
                 int thickness = 1; // Толщина текста
 
-                // Добавляем текст с данными о возрасте и поле под лицом
-                var textPosition = new System.Drawing.Point(face.X, face.Y + face.Height + 20);
+                // Добавляем текст с данными о возрасте и поле под лицом на изображение
+                var textPosition = new System.Drawing.Point(face.X, textStartY);
                 AddTextWithShadow(image, label, textPosition, fontSize, thickness);
+
+                // Сохраняем область текста, чтобы учитывать её в дальнейшем
+                usedTextAreas.Add(textArea);
             }
         }
 
@@ -220,6 +279,61 @@ namespace FaceRecognition
                     CameraFeed.Source = BitmapToImageSource(img.ToBitmap());
                 }
             }
+        }
+
+        private void ProcessImagesButton_Click(object sender, RoutedEventArgs e)
+        {
+            StartCameraButton.IsEnabled = false;
+            SelectImageButton.IsEnabled = false;
+            ProcessImagesButton.IsEnabled = false;
+
+            // Диалоговое окно выбора нескольких изображений
+            Microsoft.Win32.OpenFileDialog openFileDialog = new Microsoft.Win32.OpenFileDialog
+            {
+                Filter = "Image files (*.jpg, *.jpeg, *.png)|*.jpg;*.jpeg;*.png",
+                Multiselect = true // Разрешить выбор нескольких файлов
+            };
+
+            if (openFileDialog.ShowDialog() == true)
+            {
+                // Создаем папку для сохранения результатов, если ее нет
+                string resultDir = _config.ResultFolder;
+                if (!Directory.Exists(resultDir))
+                {
+                    Directory.CreateDirectory(resultDir);
+                }
+
+                foreach (var filePath in openFileDialog.FileNames)
+                {
+                    try
+                    {
+                        using (var img = new Image<Bgr, byte>(filePath))
+                        {
+                            // Распознаем лица и добавляем результаты
+                            DetectAndDrawFaces(img);
+
+                            // Генерируем имя для сохранения
+                            string fileName = Path.GetFileNameWithoutExtension(filePath);
+                            string resultPath = Path.Combine(resultDir, $"{fileName}_result.png");
+
+                            // Сохраняем изображение с результатами
+                            img.Save(resultPath);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        MessageBox.Show($"Ошибка при обработке файла {filePath}: {ex.Message}", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+                    }
+                }
+
+                // После завершения обработки
+                var messageBox = new CustomMessageBox(resultDir);
+                messageBox.ShowDialog();
+            }
+
+            StartCameraButton.IsEnabled = true;
+            SelectImageButton.IsEnabled = true;
+            ProcessImagesButton.IsEnabled = true;
         }
     }
 }

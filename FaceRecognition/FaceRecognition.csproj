@@ -10,6 +10,7 @@
 
   <ItemGroup>
     <None Remove="age_net.caffemodel" />
+    <None Remove="config.json" />
     <None Remove="deploy_age.prototxt" />
     <None Remove="deploy_gender.prototxt" />
     <None Remove="gender_net.caffemodel" />
@@ -17,6 +18,9 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Content Include="config.json">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
     <Content Include="deploy_age.prototxt">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>

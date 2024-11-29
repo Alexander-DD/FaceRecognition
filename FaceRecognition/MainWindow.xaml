@@ -5,10 +5,23 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:FaceRecognition"
         mc:Ignorable="d"
-        Title="Поиск лиц, используя OpenCV и EMGU" Height="515" Width="831">
+        Title="Поиск лиц, используя OpenCV и EMGU" Height="515" Width="895">
     <Grid>
-        <Image Name="CameraFeed" Margin="0,0,128,0"/>
-        <Button Name="StartCameraButton" Content="Запуск камеры" Width="140" Height="30" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,10,10,0" Click="StartCameraButton_Click"/>
-        <Button Name="SelectImageButton" Content="Распознать из файла" Width="140" Height="30" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,45,10,0" Click="SelectImageButton_Click"/>
+        <Image Name="CameraFeed" Margin="0,0,184,0"/>
+        <Button Name="StartCameraButton" Content="Запуск камеры" Width="158" Height="40" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,10,10,0" Click="StartCameraButton_Click"/>
+        <Button Name="SelectImageButton"  Width="158" Height="52" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,65,10,0" Click="SelectImageButton_Click">
+            <TextBlock TextAlignment="Center">
+                <Run Text="Распознать изображение" />
+                <LineBreak />
+                <Run Text="и отобразить" />
+            </TextBlock>
+        </Button>
+        <Button Name="ProcessImagesButton" Width="158" Height="52" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,133,10,0" Click="ProcessImagesButton_Click">
+        <TextBlock TextAlignment="Center">
+                <Run Text="Распознать изображения" />
+                <LineBreak />
+                <Run Text="и сохранить в папку result" />
+        </TextBlock>
+        </Button>
     </Grid>
 </Window>

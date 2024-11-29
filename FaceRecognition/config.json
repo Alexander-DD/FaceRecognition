@@ -1,0 +1,26 @@
+{
+  "FaceCascade": "haarcascade_frontalface_default.xml",
+  "AgeModel": {
+    "Prototxt": "deploy_age.prototxt",
+    "CaffeModel": "age_net.caffemodel"
+  },
+  "GenderModel": {
+    "Prototxt": "deploy_gender.prototxt",
+    "CaffeModel": "gender_net.caffemodel"
+  },
+  "ResultFolder": "result",
+  "CascadeSettings": {
+    "ScaleFactor": 1.1,
+    "MinNeighbors": 10
+  },
+  "BlobSettings": {
+    "ScaleFactor": 1.0,
+    "Width": 227,
+    "Height": 227
+  },
+  "MCvScalar": {
+    "V0": 78.4263377603,
+    "V1": 87.7689143744,
+    "V2": 114.895847746
+  }
+}
